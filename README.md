@@ -18,12 +18,9 @@ sssss
 4、xxxx：
 sssss
 
-
 ### 图片展示
 ![](meida/xxx.png)
 
-
-
-
-
 ### 访问地址：
+
+[open.inspur.com/cke/kubernetes](http://open.inspur.com/cke/kubernetes)

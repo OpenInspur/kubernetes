@@ -1,0 +1,3 @@
+#!/bin/bash
+
+go build -v -x -o _output/bin/hyperkube -ldflags "-X k8s.io/kubernetes/pkg/version.gitCommit=5e53fd6bc17c0dec8434817e69b04a25d8ae0ff0 -X kubernetes/vendor/k8s.io/client-go/pkg/version.gitCommit=5e53fd6bc17c0dec8434817e69b04a25d8ae0ff0 -X k8s.io/kubernetes/pkg/version.gitTreeState=archive -X k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version.gitTreeState=archive -X k8s.io/kubernetes/pkg/version.gitVersion=v1.14.3 -X k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version.gitVersion=v1.14.3 -X k8s.io/kubernetes/pkg/version.gitMajor=1 -X k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version.gitMajor=1 -X k8s.io/kubernetes/pkg/version.gitMinor=14 -X k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version.gitMinor=14  -s -w" ./cmd/hyperkube/main.go
