@@ -35,6 +35,7 @@ type Backoff struct {
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 	perItemBackoff  map[string]*backoffEntry
+	resetDuration   time.Duration
 }
 
 func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
@@ -55,6 +56,16 @@ func NewBackOff(initial, max time.Duration) *Backoff {
 	}
 }
 
+func NewBackOffWithReset(initial, max, reset time.Duration) *Backoff {
+	return &Backoff{
+		perItemBackoff:  map[string]*backoffEntry{},
+		Clock:           clock.RealClock{},
+		defaultDuration: initial,
+		maxDuration:     max,
+		resetDuration:   reset,
+	}
+}
+
 // Get the current backoff Duration
 func (p *Backoff) Get(id string) time.Duration {
 	p.Lock()
@@ -72,7 +83,7 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	p.Lock()
 	defer p.Unlock()
 	entry, ok := p.perItemBackoff[id]
-	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration, p.resetDuration) {
 		entry = p.initEntryUnsafe(id)
 	} else {
 		delay := entry.backoff * 2 // exponential
@@ -96,7 +107,7 @@ func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	if !ok {
 		return false
 	}
-	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration, p.resetDuration) {
 		return false
 	}
 	return p.Clock.Now().Sub(eventTime) < entry.backoff
@@ -110,7 +121,7 @@ func (p *Backoff) IsInBackOffSinceUpdate(id string, eventTime time.Time) bool {
 	if !ok {
 		return false
 	}
-	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration, p.resetDuration) {
 		return false
 	}
 	return eventTime.Sub(entry.lastUpdate) < entry.backoff
@@ -144,6 +155,10 @@ func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 }
 
 // After 2*maxDuration we restart the backoff factor to the beginning
-func hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
-	return eventTime.Sub(lastUpdate) > maxDuration*2 // consider stable if it's ok for twice the maxDuration
+func hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration, reset time.Duration) bool {
+	if reset != 0 {
+		return eventTime.Sub(lastUpdate) > reset
+	} else {
+		return eventTime.Sub(lastUpdate) > maxDuration*2 // consider stable if it's ok for twice the maxDuration
+	}
 }

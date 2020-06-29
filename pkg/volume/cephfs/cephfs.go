@@ -17,6 +17,7 @@ limitations under the License.
 package cephfs
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -44,6 +46,7 @@ type cephfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &cephfsPlugin{}
+var _ volume.ExpandableVolumePlugin = &cephfsPlugin{}
 
 const (
 	cephfsPluginName = "kubernetes.io/cephfs"
@@ -475,4 +478,20 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		return "", "", nil
 	}
 	return "", "", fmt.Errorf("Spec does not reference an CephFS volume type")
+}
+
+func (plugin *cephfsPlugin) RequiresFSResize() bool {
+	return false
+}
+
+func (plugin *cephfsPlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	if newSize.Value() > 0 {
+		return newSize, nil
+	}
+	klog.Errorf("Cephfs invalid new volume size")
+	return oldSize, errors.New("Cephfs invalid new volume size.")
+
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package local
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -56,6 +58,7 @@ type localVolumePlugin struct {
 var _ volume.VolumePlugin = &localVolumePlugin{}
 var _ volume.PersistentVolumePlugin = &localVolumePlugin{}
 var _ volume.BlockVolumePlugin = &localVolumePlugin{}
+var _ volume.ExpandableVolumePlugin = &localVolumePlugin{}
 
 const (
 	localVolumePluginName = "kubernetes.io/local-volume"
@@ -594,4 +597,19 @@ func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
 	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
 		utilstrings.EscapeQualifiedName(localVolumePluginName)), lv.volName
+}
+
+func (plugin *localVolumePlugin) RequiresFSResize() bool {
+	return false
+}
+
+func (plugin *localVolumePlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	if newSize.Value() > 0 {
+		return newSize, nil
+	}
+	klog.Errorf("Local pv invalid new volume size")
+	return oldSize, errors.New("Local pv invalid new volume size.")
 }

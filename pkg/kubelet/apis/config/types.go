@@ -311,6 +311,15 @@ type KubeletConfiguration struct {
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
+	// Added by Inspur-cloud
+	// MaxContainerBackOffSeconds is the max backoff period in seconds, for user control
+	// If not set, use 300s as default value
+	MaxContainerBackOffSeconds int32
+	// ContainerBackOffResetSeconds is the reset period of a success restart of pod.
+	// If not set, use 2 * MaxContainerBackOffSeconds as default value
+	ContainerBackOffResetSeconds int32
+	// NodeLeaseRenewIntervalSeconds is the renewal interval of node lease. Default 10.
+	NodeLeaseRenewIntervalSeconds int32
 }
 
 type KubeletAuthorizationMode string

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/kubernetes/pkg/volume/photon_pd"
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
@@ -108,6 +109,18 @@ func ProbeExpandableVolumePlugins(config kubectrlmgrconfig.VolumeConfiguration) 
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cephfs.ProbeVolumePlugins()...)
+
+	nfsConfig := volume.VolumeConfig{
+		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS),
+		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS),
+		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+	}
+	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
+		klog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
+	}
+	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
+	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	return allPlugins
 }
 

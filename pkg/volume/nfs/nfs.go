@@ -17,6 +17,7 @@ limitations under the License.
 package nfs
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -53,6 +55,7 @@ type nfsPlugin struct {
 var _ volume.VolumePlugin = &nfsPlugin{}
 var _ volume.PersistentVolumePlugin = &nfsPlugin{}
 var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
+var _ volume.ExpandableVolumePlugin = &nfsPlugin{}
 
 const (
 	nfsPluginName = "kubernetes.io/nfs"
@@ -310,4 +313,19 @@ func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
+}
+
+func (plugin *nfsPlugin) RequiresFSResize() bool {
+	return false
+}
+
+func (plugin *nfsPlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	if newSize.Value() > 0 {
+		return newSize, nil
+	}
+	klog.Errorf("NFS invalid new volume size")
+	return oldSize, errors.New("NFS invalid new volume size.")
 }

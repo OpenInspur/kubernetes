@@ -22,6 +22,7 @@ import (
 	"net"
 	goruntime "runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/klog"
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -404,6 +406,17 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		util.FromApiserverCache(&opts)
 	}
 	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)
+
+	if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+		//reconnect
+		klog.Errorf("error getting node %q: %v. Trying to reconnect", kl.nodeName, err)
+		kl.heartbeatClient, err = clientset.NewForConfig(&kl.heartbeatClientConfig)
+		node, err = kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)
+		if err != nil {
+			return fmt.Errorf("error getting node after reconnecting, %q: %v", kl.nodeName, err)
+		}
+	}
+
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}

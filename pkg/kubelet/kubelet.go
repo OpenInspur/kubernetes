@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"k8s.io/client-go/rest"
 	"math"
 	"net"
 	"net/http"
@@ -245,6 +246,7 @@ type Dependencies struct {
 	DockerClientConfig      *dockershim.ClientConfig
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         clientset.Interface
+	HeartbeatClientConfig   rest.Config
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
 	Mounter                 mount.Interface
@@ -490,6 +492,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeName:                                nodeName,
 		kubeClient:                              kubeDeps.KubeClient,
 		heartbeatClient:                         kubeDeps.HeartbeatClient,
+		heartbeatClientConfig:                   kubeDeps.HeartbeatClientConfig,
 		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                           rootDirectory,
 		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
@@ -818,7 +821,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
-	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	if kubeCfg.MaxContainerBackOffSeconds > 0 {
+		klet.backOff = flowcontrol.NewBackOffWithReset(backOffPeriod, time.Duration(kubeCfg.MaxContainerBackOffSeconds)*time.Second, time.Duration(kubeCfg.ContainerBackOffResetSeconds)*time.Second)
+	} else {
+		klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	}
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 
 	// setup eviction manager
@@ -865,7 +872,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		klet.nodeLeaseController = nodelease.NewController(klet.clock, klet.heartbeatClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure)
+		klet.nodeLeaseController = nodelease.NewController(klet.clock, klet.heartbeatClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, kubeCfg.NodeLeaseRenewIntervalSeconds, klet.onRepeatedHeartbeatFailure)
 	}
 
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
@@ -898,6 +905,7 @@ type Kubelet struct {
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
 	heartbeatClient clientset.Interface
+	heartbeatClientConfig rest.Config
 	iptClient       utilipt.Interface
 	rootDirectory   string
 
@@ -2095,7 +2103,8 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
 		if err := kl.deletePod(pod); err != nil {
-			klog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
+			// klog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
+			klog.Errorf("Failed to delete pod %q, err: %v, will try again in next periodic cleanup routine.", format.Pod(pod), err)
 		}
 		kl.probeManager.RemovePod(pod)
 	}

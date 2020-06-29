@@ -718,6 +718,21 @@ type KubeletConfiguration struct {
 	// Default: ["pods"]
 	// +optional
 	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
+	// Added by Inspur-cloud
+	// MaxContainerBackOffSeconds is the max backoff period in seconds, for user control
+	// If not set, use 300s as default value
+	// Default: 300
+	// +optional
+	MaxContainerBackOffSeconds int32 `json:"maxContainerBackOffSeconds,omitempty"`
+	// ContainerBackOffResetSeconds is the reset period of a success restart of pod.
+	// If not set, use 2 * MaxContainerBackOffSeconds as default value
+	// Default: 0
+	// +optional
+	ContainerBackOffResetSeconds int32 `json:"containerBackOffResetSeconds,omitempty"`
+	// NodeLeaseRenewIntervalSeconds is the renewal interval of node lease. Default 10.
+	// Default: 10
+	// +optional
+	NodeLeaseRenewIntervalSeconds int32 `json:"nodeLeaseRenewIntervalSeconds,omitempty"`
 }
 
 type KubeletAuthorizationMode string

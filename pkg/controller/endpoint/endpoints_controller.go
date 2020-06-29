@@ -384,13 +384,19 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 		return
 	}
 
-	if e.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
-		e.queue.AddRateLimited(key)
-		return
+	i, n := e.queue.NumRequeues(key)/maxRetries, e.queue.NumRequeues(key)%maxRetries
+	if i < 5 {
+		if n > 0 && n < maxRetries {
+			klog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
+			e.queue.AddRateLimited(key)
+			return
+		}
+		if i > 0 && n == 0 {
+			klog.Warningf("Dropping service %q out of the queue: %v, times: %d", key, err, i)
+		}
 	}
+	klog.Warningf("Dropping service %q out of the queue: %v, times: %d, and won't try again", key, err, i)
 
-	klog.Warningf("Dropping service %q out of the queue: %v", key, err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }

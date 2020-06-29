@@ -109,6 +109,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.ContainerBackOffResetSeconds < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ContainerBackOffResetSeconds (--container-backoff-reset-seconds) %v must not be a negative number", kc.ContainerBackOffResetSeconds))
+	}
+	if kc.MaxContainerBackOffSeconds < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxContainerBackOffSeconds (--max-container-backoff-seconds) %v must not be a negative number", kc.MaxContainerBackOffSeconds))
+	}
+	if kc.NodeLeaseRenewIntervalSeconds < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLeaseRenewIntervalSeconds (--node-lease-renew-interval-seconds) %v must not be a negative number", kc.NodeLeaseRenewIntervalSeconds))
+	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
